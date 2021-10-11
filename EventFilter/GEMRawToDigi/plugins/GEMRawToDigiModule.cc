@@ -239,16 +239,41 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
             GEMROMapping::channelNum chMap{vfat_dc.vfatType, chan};
             GEMROMapping::stripNum stMap = gemROMap->hitPos(chMap);
 
-            int stripId = stMap.stNum + vfatData.phi() * GEMeMap::maxChan_;
+            int stripId = stMap.stNum;
 
-            GEMDigi digi(stripId, bx);
+            if (gemId.isGE21()) {
 
-            LogDebug("GEMRawToDigiModule")
-                << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
-                << ",type:" << vfat_dc.vfatType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
-                << " bx:" << digi.bx();
+              auto gemIdEta = gemId;
 
-            outGEMDigis.get()->insertDigi(gemId, digi);
+              if (stripId > 63) {
+                stripId -= 64;
+                gemIdEta = GEMDetId(gemId.region(), gemId.ring(), gemId.station(), gemId.layer(), gemId.chamber(), gemId.ieta()+1);
+              }
+
+              stripId += vfatData.phi() * GEMeMap::maxChan_ / 2;
+
+              GEMDigi digi(stripId, bx);
+
+              LogDebug("GEMRawToDigiModule")
+                  << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
+                  << ",type:" << vfat_dc.vfatType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
+                  << " bx:" << digi.bx();
+
+              outGEMDigis.get()->insertDigi(gemIdEta, digi);
+            }
+            else {
+
+              stripId += vfatData.phi() * GEMeMap::maxChan_;
+
+              GEMDigi digi(stripId, bx);
+
+              LogDebug("GEMRawToDigiModule")
+                  << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
+                  << ",type:" << vfat_dc.vfatType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
+                  << " bx:" << digi.bx();
+
+              outGEMDigis.get()->insertDigi(gemId, digi);
+            }
 
           }  // end of channel loop
 
