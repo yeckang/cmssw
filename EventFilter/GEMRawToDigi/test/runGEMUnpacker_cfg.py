@@ -141,7 +141,7 @@ if (options.debug):
 
 # Other statements
 from Configuration.AlCa.GlobalTag import GlobalTag
-process.GlobalTag = GlobalTag(process.GlobalTag, '112X_dataRun3_Prompt_v5', '')
+process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase1_2021_realistic', '')
 ## for the time being the mapping does not work with the data label. Use MC instead
 if options.useB904Data:
     process.GlobalTag.toGet = cms.VPSet(
