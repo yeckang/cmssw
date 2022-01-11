@@ -136,52 +136,58 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
         if (!gemROMap->isValidChamber(geb_ec))
           continue;
         GEMROMapping::chamDC geb_dc = gemROMap->chamberPos(geb_ec);
+        GEMDetId cid = geb_dc.detId;
 
-        auto vfats = gemROMap->getVfats(geb_dc.detId);
-        for (auto const& vfat_ec : vfats) {
-          GEMROMapping::vfatDC vfat_dc = gemROMap->vfatPos(vfat_ec);
-          GEMDetId gemId = vfat_dc.detId;
-          uint16_t vfatId = vfat_ec.vfatAdd;
+        auto vfats = gemROMap->getVfats(geb_dc.chamberType);
+        int chamberType = geb_dc.chamberType;
 
-          for (auto const& gemBx : gemBxMap) {
-            int bc = BX_id + gemBx.first;
+        for (auto const& vfatId : vfats) {
+          GEMROMapping::vfatDC vfat_dc{chamberType, vfatId};
+          auto iEtas = gemROMap->getIEtas(vfat_dc);
+          for (auto iEta : iEtas) {
+            GEMDetId gemId(cid.region(), cid.ring(), cid.station(), cid.layer(), cid.chamber(), iEta);
 
-            bool hasDigi = false;
-            uint64_t lsData = 0;  ///<channels from 1to64
-            uint64_t msData = 0;  ///<channels from 65to128
+            for (auto const& gemBx : gemBxMap) {
+              int bc = BX_id + gemBx.first;
 
-            GEMDigiCollection inBxGemDigis = gemBx.second;
-            const GEMDigiCollection::Range& range = inBxGemDigis.get(gemId);
-            for (GEMDigiCollection::const_iterator digiIt = range.first; digiIt != range.second; ++digiIt) {
-              const GEMDigi& digi = (*digiIt);
+              bool hasDigi = false;
+              uint64_t lsData = 0;  ///<channels from 1to64
+              uint64_t msData = 0;  ///<channels from 65to128
 
-              int localStrip = digi.strip() - vfat_dc.localPhi * GEMeMap::maxChan_;
+              GEMDigiCollection inBxGemDigis = gemBx.second;
+              const GEMDigiCollection::Range& range = inBxGemDigis.get(gemId);
+              for (GEMDigiCollection::const_iterator digiIt = range.first; digiIt != range.second; ++digiIt) {
+                const GEMDigi& digi = (*digiIt);
 
-              // skip strips not in current vFat
-              if (localStrip < 0 || localStrip > GEMeMap::maxChan_ - 1)
+                int strip = digi.strip();
+
+                hasDigi = true;
+                GEMROMapping::stripNum stMap = {geb_dc.chamberType, iEta, strip};
+                if (!gemROMap->isValidStripNum(stMap))
+                  continue;
+                GEMROMapping::channelNum chMap = gemROMap->hitPos(stMap);
+
+                if (chMap.vfatAdd != vfatId)
+                  continue;
+
+                if (chMap.chNum < 64)
+                  lsData |= 1UL << chMap.chNum;
+                else
+                  msData |= 1UL << (chMap.chNum - 64);
+
+                LogDebug("GEMDigiToRawModule")
+                    << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
+                    << ",type:" << geb_dc.chamberType << " id:" << gemId << " ch:" << chMap.chNum
+                    << " st:" << digi.strip() << " bx:" << digi.bx();
+              }
+
+              if (!hasDigi)
                 continue;
-
-              hasDigi = true;
-              GEMROMapping::stripNum stMap = {vfat_dc.vfatType, localStrip};
-              GEMROMapping::channelNum chMap = gemROMap->hitPos(stMap);
-
-              if (chMap.chNum < 64)
-                lsData |= 1UL << chMap.chNum;
-              else
-                msData |= 1UL << (chMap.chNum - 64);
-
-              LogDebug("GEMDigiToRawModule")
-                  << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
-                  << ",type:" << vfat_dc.vfatType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
-                  << " bx:" << digi.bx();
+              // only make vfat with hits
+              amcSize += 3;
+              auto vfat = std::make_unique<GEMVFAT>(geb_dc.vfatVer, bc, LV1_id, vfatId, lsData, msData);
+              optoH->addVFAT(*vfat);
             }
-
-            if (!hasDigi)
-              continue;
-            // only make vfat with hits
-            amcSize += 3;
-            auto vfat = std::make_unique<GEMVFAT>(geb_dc.vfatVer, bc, LV1_id, vfatId, lsData, msData);
-            optoH->addVFAT(*vfat);
           }
         }  // end of vfats in GEB
 
