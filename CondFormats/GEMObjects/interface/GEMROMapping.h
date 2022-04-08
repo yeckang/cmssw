@@ -25,7 +25,7 @@ public:
   struct chamEC {
     unsigned int fedId;
     uint8_t amcNum;
-    uint8_t gebId;
+    uint16_t gebId;
     bool operator<(const chamEC& r) const {
       if (fedId == r.fedId) {
         if (amcNum == r.amcNum) {
@@ -41,78 +41,83 @@ public:
 
   struct chamDC {
     GEMDetId detId;
+    int chamberType;
     int vfatVer;
     bool operator<(const chamDC& r) const { return detId < r.detId; }
   };
 
-  struct vfatEC {
+  struct vfatDC {
+    int chamberType;
     uint16_t vfatAdd;
-    GEMDetId detId;
-    bool operator<(const vfatEC& r) const {
+    bool operator<(const vfatDC& r) const {
       if (vfatAdd == r.vfatAdd) {
-        return detId < r.detId;
+        return chamberType < r.chamberType;
       } else {
         return vfatAdd < r.vfatAdd;
       }
     }
   };
 
-  struct vfatDC {
-    int vfatType;
-    GEMDetId detId;
-    int localPhi;
-    bool operator<(const vfatDC& r) const {
-      if (vfatType == r.vfatType) {
-        if (detId == r.detId) {
-          return localPhi < r.localPhi;
+  struct channelNum {
+    int chamberType;
+    int vfatAdd;
+    int chNum;
+    bool operator<(const channelNum& c) const {
+      if (chamberType == c.chamberType) {
+        if (vfatAdd == c.vfatAdd) {
+          return chNum < c.chNum;
         } else {
-          return detId < r.detId;
+          return vfatAdd < c.vfatAdd;
         }
       } else {
-        return vfatType < r.vfatType;
+        return chamberType < c.chamberType;
       }
     }
   };
 
-  struct channelNum {
-    int vfatType;
-    int chNum;
-    bool operator<(const channelNum& c) const {
-      if (vfatType == c.vfatType)
-        return chNum < c.chNum;
-      else
-        return vfatType < c.vfatType;
-    }
-  };
-
   struct stripNum {
-    int vfatType;
+    int chamberType;
+    int iEta;
     int stNum;
     bool operator<(const stripNum& s) const {
-      if (vfatType == s.vfatType)
-        return stNum < s.stNum;
-      else
-        return vfatType < s.vfatType;
+      if (chamberType == s.chamberType) {
+        if (iEta == s.iEta) {
+          return stNum < s.stNum;
+        } else {
+          return iEta < s.iEta;
+        }
+      } else {
+        return chamberType < s.chamberType;
+      }
     }
   };
 
   GEMROMapping(){};
 
-  bool isValidChipID(const vfatEC& r) const { return vfatMap_.find(r) != vfatMap_.end(); }
   bool isValidChamber(const chamEC& r) const { return chamberMap_.find(r) != chamberMap_.end(); }
 
+  bool isValidChipID(const vfatDC& r) const { return chamIEtas_.find(r) != chamIEtas_.end(); }
+
   bool isValidAMC(const sectorEC& r) const { return std::find(amcVec_.begin(), amcVec_.end(), r) != amcVec_.end(); }
+
+  bool isValidStripNum(const stripNum& r) const { return stChMap_.find(r) != stChMap_.end(); }
 
   void add(sectorEC e) { amcVec_.push_back(e); }
 
   const chamDC& chamberPos(const chamEC& r) const { return chamberMap_.at(r); }
   void add(chamEC e, chamDC d) { chamberMap_[e] = d; }
 
-  const std::vector<vfatEC> getVfats(const GEMDetId& r) const { return chamVfats_.at(r); }
-  void add(GEMDetId e, vfatEC d) { chamVfats_[e].push_back(d); }
+  const std::vector<uint16_t> getVfats(const int type) const { return chamVfats_.at(type); }
+  void add(int type, uint16_t d) {
+    if (std::find(chamVfats_[type].begin(), chamVfats_[type].end(), d) == chamVfats_[type].end())
+      chamVfats_[type].push_back(d);
+  }
 
-  const vfatDC& vfatPos(const vfatEC& r) const { return vfatMap_.at(r); }
-  void add(vfatEC e, vfatDC d) { vfatMap_[e] = d; }
+  const std::vector<int> getIEtas(const vfatDC dc) const { return chamIEtas_.at(dc); }
+  void add(vfatDC d, int iEta) {
+    if (std::find(chamIEtas_[d].begin(), chamIEtas_[d].end(), iEta) == chamIEtas_[d].end())
+      chamIEtas_[d].push_back(iEta);
+  }
 
   const channelNum& hitPos(const stripNum& s) const { return stChMap_.at(s); }
   const stripNum& hitPos(const channelNum& c) const { return chStMap_.at(c); }
@@ -126,9 +131,8 @@ private:
   // electronics map to GEMDetId chamber
   std::map<chamEC, chamDC> chamberMap_;
 
-  std::map<GEMDetId, std::vector<vfatEC>> chamVfats_;
-
-  std::map<vfatEC, vfatDC> vfatMap_;
+  std::map<int, std::vector<uint16_t>> chamVfats_;
+  std::map<vfatDC, std::vector<int>> chamIEtas_;
 
   std::map<channelNum, stripNum> chStMap_;
   std::map<stripNum, channelNum> stChMap_;
