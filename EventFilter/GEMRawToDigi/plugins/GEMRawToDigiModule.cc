@@ -6,7 +6,6 @@
 
 #include "CondFormats/DataRecord/interface/GEMeMapRcd.h"
 #include "CondFormats/GEMObjects/interface/GEMeMap.h"
-#include "CondFormats/GEMObjects/interface/GEMROMapping.h"
 #include "DataFormats/Common/interface/Handle.h"
 #include "DataFormats/FEDRawData/interface/FEDNumbering.h"
 #include "DataFormats/FEDRawData/interface/FEDRawDataCollection.h"
@@ -20,7 +19,7 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/Run.h"
-#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
@@ -29,15 +28,14 @@
 #include "FWCore/Utilities/interface/Transition.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
-class GEMRawToDigiModule : public edm::global::EDProducer<edm::RunCache<GEMROMapping> > {
+class GEMRawToDigiModule : public edm::stream::EDProducer<> {
 public:
   /// Constructor
   GEMRawToDigiModule(const edm::ParameterSet& pset);
 
   // global::EDProducer
-  std::shared_ptr<GEMROMapping> globalBeginRun(edm::Run const&, edm::EventSetup const&) const override;
-  void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
-  void globalEndRun(edm::Run const&, edm::EventSetup const&) const override{};
+  void beginRun(edm::Run const&, edm::EventSetup const&) override;
+  void produce(edm::Event&, edm::EventSetup const&) override;
 
   // Fill parameters descriptions
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
@@ -47,6 +45,7 @@ private:
   edm::ESGetToken<GEMeMap, GEMeMapRcd> gemEMapToken_;
   bool useDBEMap_, keepDAQStatus_, readMultiBX_, ge21Off_;
   unsigned int fedIdStart_, fedIdEnd_;
+  std::shared_ptr<GEMeMap> gemEMap_;
   std::unique_ptr<GEMRawToDigi> gemRawToDigi_;
 };
 
@@ -92,23 +91,18 @@ void GEMRawToDigiModule::fillDescriptions(edm::ConfigurationDescriptions& descri
   descriptions.add("muonGEMDigisDefault", desc);
 }
 
-std::shared_ptr<GEMROMapping> GEMRawToDigiModule::globalBeginRun(edm::Run const&, edm::EventSetup const& iSetup) const {
-  auto gemROmap = std::make_shared<GEMROMapping>();
+void GEMRawToDigiModule::beginRun(edm::Run const&, edm::EventSetup const& iSetup) {
   if (useDBEMap_) {
     const auto& eMap = iSetup.getData(gemEMapToken_);
-    auto gemEMap = std::make_unique<GEMeMap>(eMap);
-    gemEMap->convert(*gemROmap);
-    gemEMap.reset();
+    gemEMap_ =  std::make_shared<GEMeMap>(eMap);
   } else {
     // no EMap in DB, using dummy
-    auto gemEMap = std::make_unique<GEMeMap>();
-    gemEMap->convertDummy(*gemROmap);
-    gemEMap.reset();
+    gemEMap_ = std::make_shared<GEMeMap>();
+    gemEMap_->setDummy();
   }
-  return gemROmap;
 }
 
-void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::EventSetup const& iSetup) const {
+void GEMRawToDigiModule::produce(edm::Event& iEvent, edm::EventSetup const& iSetup) {
   auto outGEMDigis = std::make_unique<GEMDigiCollection>();
   auto outAMC13Status = std::make_unique<GEMAMC13StatusCollection>();
   auto outAMCStatus = std::make_unique<GEMAMCStatusCollection>();
@@ -118,8 +112,6 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
   // Take raw from the event
   edm::Handle<FEDRawDataCollection> fed_buffers;
   iEvent.getByToken(fed_token, fed_buffers);
-
-  auto gemROMap = runCache(iEvent.getRun().index());
 
   for (unsigned int fedId = fedIdStart_; fedId <= fedIdEnd_; ++fedId) {
     const FEDRawData& fedData = fed_buffers->FEDData(fedId);
@@ -145,8 +137,8 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
     // Read AMC data
     for (const auto& amc : *(amc13->getAMCpayloads())) {
       uint8_t amcNum = amc.amcNum();
-      GEMROMapping::sectorEC amcEC{fedId, amcNum};
-      if (!gemROMap->isValidAMC(amcEC)) {
+      GEMeMap::sectorEC amcEC{fedId, amcNum};
+      if (!gemEMap_->isValidAMC(amcEC)) {
         st_amc13.inValidAMC();
         continue;
       }
@@ -167,15 +159,15 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
       // Read GEB data
       for (const auto& optoHybrid : *amc.gebs()) {
         uint8_t gebId = optoHybrid.inputID();
-        GEMROMapping::chamEC geb_ec{fedId, amcNum, gebId};
+        GEMeMap::chamEC geb_ec{fedId, amcNum, gebId};
 
-        bool isValidChamber = gemROMap->isValidChamber(geb_ec);
+        bool isValidChamber = gemEMap_->isValidChamber(geb_ec);
         if (!isValidChamber) {
           st_amc.inValidOH();
           continue;
         }
-        GEMROMapping::chamDC geb_dc = gemROMap->chamberPos(geb_ec);
-        GEMDetId gemChId = geb_dc.detId;
+        GEMeMap::chamDC geb_dc = gemEMap_->chamberPos(geb_ec);
+        GEMDetId gemChId(geb_dc.detId);
 
         GEMOHStatus st_oh(optoHybrid);
         if (st_oh.isBad()) {
@@ -190,9 +182,9 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
           // set vfat fw version
           vfat.setVersion(geb_dc.vfatVer);
           uint16_t vfatId = vfat.vfatId();
-          GEMROMapping::vfatEC vfat_ec{geb_dc.chamberType, vfatId};
+          GEMeMap::vfatEC vfat_ec{geb_dc.chamberType, vfatId};
 
-          if (!gemROMap->isValidChipID(vfat_ec)) {
+          if (!gemEMap_->isValidChipID(vfat_ec)) {
             st_oh.inValidVFAT();
             continue;
           }
@@ -221,8 +213,8 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
             if (chan0xf == 0)
               continue;
 
-            GEMROMapping::channelNum chMap{vfat_ec.chamberType, vfat_ec.vfatAdd, chan};
-            GEMROMapping::stripNum stMap = gemROMap->hitPos(chMap);
+            GEMeMap::channelNum chMap{vfat_ec.chamberType, vfat_ec.vfatAdd, chan};
+            GEMeMap::stripNum stMap = gemEMap_->hitPos(chMap);
 
             int stripId = stMap.stNum;
             int ieta = stMap.iEta;
@@ -232,10 +224,11 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
 
             GEMDigi digi(stripId, bx);
 
-            LogDebug("GEMRawToDigiModule")
+            //LogDebug("GEMRawToDigiModule")
+            std::cout 
                 << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
                 << ",type:" << vfat_ec.chamberType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
-                << " bx:" << digi.bx();
+                << " bx:" << digi.bx() << std::endl;
 
             outGEMDigis.get()->insertDigi(gemId, digi);
 

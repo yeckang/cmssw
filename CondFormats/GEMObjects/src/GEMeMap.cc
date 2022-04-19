@@ -1,5 +1,4 @@
 #include "CondFormats/GEMObjects/interface/GEMeMap.h"
-#include "CondFormats/GEMObjects/interface/GEMROMapping.h"
 #include "DataFormats/MuonDetId/interface/GEMDetId.h"
 #include "DataFormats/FEDRawData/interface/FEDNumbering.h"
 
@@ -11,55 +10,18 @@ GEMeMap::~GEMeMap() {}
 
 const std::string& GEMeMap::version() const { return theVersion; }
 
-void GEMeMap::convert(GEMROMapping& romap) {
-  // fed->amc->geb mapping to GEMDetId
-  for (auto imap : theChamberMap_) {
-    for (unsigned int ix = 0; ix < imap.fedId.size(); ix++) {
-      GEMROMapping::chamEC ec{imap.fedId[ix], imap.amcNum[ix], imap.gebId[ix]};
-      GEMROMapping::chamDC dc;
-      dc.detId = GEMDetId((imap.gemNum[ix] > 0) ? 1 : -1,
-                          1,
-                          abs(imap.gemNum[ix] / 1000),
-                          abs(imap.gemNum[ix] / 100 % 10),
-                          abs(imap.gemNum[ix] % 100),
-                          0);
-      dc.chamberType = imap.chamberType[ix];
-      dc.vfatVer = imap.vfatVer[ix];
-      romap.add(ec, dc);
-      GEMROMapping::sectorEC amcEC = {imap.fedId[ix], imap.amcNum[ix]};
-      if (!romap.isValidAMC(amcEC))
-        romap.add(amcEC);
-    }
-  }
-
-  // channel mapping
-  for (auto imap : theStripMap_) {
-    for (unsigned int ix = 0; ix < imap.chamberType.size(); ix++) {
-      GEMROMapping::channelNum cMap;
-      cMap.chamberType = imap.chamberType[ix];
-      cMap.vfatAdd = imap.vfatAdd[ix];
-      cMap.chNum = imap.vfatCh[ix];
-
-      GEMROMapping::stripNum sMap;
-      sMap.chamberType = imap.chamberType[ix];
-      sMap.iEta = imap.iEta[ix];
-      sMap.stNum = imap.strip[ix];
-
-      romap.add(cMap, sMap);
-      romap.add(sMap, cMap);
-
-      GEMROMapping::vfatEC ec;
-      ec.vfatAdd = cMap.vfatAdd;
-      ec.chamberType = cMap.chamberType;
-
-      romap.add(cMap.chamberType, cMap.vfatAdd);
-      romap.add(ec, sMap.iEta);
-    }
-  }
-}
-
-void GEMeMap::convertDummy(GEMROMapping& romap) {
+void GEMeMap::setDummy() {
   // 12 bits for vfat, 5 bits for geb, 8 bit long GLIB serial number
+  amcVec_.clear();
+
+  chamberMap_.clear();
+  
+  chamVfats_.clear();
+  chamIEtas_.clear();
+
+  chStMap_.clear();
+  stChMap_.clear();
+
   unsigned int fedId = 0;
 
   for (int st = GEMDetId::minStationId0; st <= GEMDetId::maxStationId; ++st) {
@@ -85,12 +47,12 @@ void GEMeMap::convertDummy(GEMROMapping& romap) {
           continue;
         for (int i = 0; i < maxChan_; ++i) {
           // only 1 vfat type for dummy map
-          GEMROMapping::channelNum cMap;
+          GEMeMap::channelNum cMap;
           cMap.chamberType = st;
           cMap.vfatAdd = chipPos;
           cMap.chNum = i;
 
-          GEMROMapping::stripNum sMap;
+          GEMeMap::stripNum sMap;
           sMap.chamberType = st;
           if (st != 2) {
             sMap.iEta = ieta;
@@ -100,15 +62,15 @@ void GEMeMap::convertDummy(GEMROMapping& romap) {
             sMap.stNum = i / 2 + lphi * maxChan_ / 2;
           }
 
-          romap.add(cMap, sMap);
-          romap.add(sMap, cMap);
+          add(cMap, sMap);
+          add(sMap, cMap);
 
-          GEMROMapping::vfatEC ec;
+          GEMeMap::vfatEC ec;
           ec.vfatAdd = cMap.vfatAdd;
           ec.chamberType = st;
 
-          romap.add(cMap.chamberType, cMap.vfatAdd);
-          romap.add(ec, sMap.iEta);
+          add(cMap.chamberType, cMap.vfatAdd);
+          add(ec, sMap.iEta);
         }
         chipPos++;
       }
@@ -128,20 +90,20 @@ void GEMeMap::convertDummy(GEMROMapping& romap) {
         for (int ly = 1; ly <= maxLayerId; ++ly) {
           GEMDetId gemId(re, 1, st, ly, ch, 0);
 
-          GEMROMapping::chamEC ec;
+          GEMeMap::chamEC ec;
           ec.fedId = fedId;
           ec.gebId = gebId;
           ec.amcNum = amcNum;
 
-          GEMROMapping::chamDC dc;
+          GEMeMap::chamDC dc;
           dc.detId = gemId;
           dc.chamberType = st;
           dc.vfatVer = vfatVerV3_;
-          romap.add(ec, dc);
+          add(ec, dc);
 
-          GEMROMapping::sectorEC amcEC = {fedId, amcNum};
-          if (!romap.isValidAMC(amcEC))
-            romap.add(amcEC);
+          GEMeMap::sectorEC amcEC = {fedId, amcNum};
+          if (!isValidAMC(amcEC))
+            add(amcEC);
 
           // 5 bits for gebId
           if (st > 0 && gebId == maxGEB1_) {
