@@ -2,55 +2,163 @@
 #define CondFormats_GEMObjects_GEMeMap_h
 
 #include "CondFormats/Serialization/interface/Serializable.h"
+#include "DataFormats/MuonDetId/interface/GEMDetId.h"
+#include <map>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 class GEMROMapping;
 
 class GEMeMap {
 public:
+  struct sectorEC {
+    unsigned int fedId;
+    uint8_t amcNum;
+    bool operator==(const sectorEC& r) const {
+      if (fedId == r.fedId) {
+        return amcNum == r.amcNum;
+      } else {
+        return false;
+      }
+    }
+
+    COND_SERIALIZABLE;
+  };
+
+  struct chamEC {
+    unsigned int fedId;
+    uint8_t amcNum;
+    uint16_t gebId;
+    bool operator<(const chamEC& r) const {
+      if (fedId == r.fedId) {
+        if (amcNum == r.amcNum) {
+          return gebId < r.gebId;
+        } else {
+          return amcNum < r.amcNum;
+        }
+      } else {
+        return fedId < r.fedId;
+      }
+    }
+
+    COND_SERIALIZABLE;
+  };
+
+  struct chamDC {
+    uint32_t detId;
+    int chamberType;
+    int vfatVer;
+    bool operator<(const chamDC& r) const { return detId < r.detId; }
+
+    COND_SERIALIZABLE;
+  };
+
+  struct vfatEC {
+    int chamberType;
+    uint16_t vfatAdd;
+    bool operator<(const vfatEC& r) const {
+      if (vfatAdd == r.vfatAdd) {
+        return chamberType < r.chamberType;
+      } else {
+        return vfatAdd < r.vfatAdd;
+      }
+    }
+
+    COND_SERIALIZABLE;
+  };
+
+  struct channelNum {
+    int chamberType;
+    int vfatAdd;
+    int chNum;
+    bool operator<(const channelNum& c) const {
+      if (chamberType == c.chamberType) {
+        if (vfatAdd == c.vfatAdd) {
+          return chNum < c.chNum;
+        } else {
+          return vfatAdd < c.vfatAdd;
+        }
+      } else {
+        return chamberType < c.chamberType;
+      }
+    }
+
+    COND_SERIALIZABLE;
+  };
+
+  struct stripNum {
+    int chamberType;
+    int iEta;
+    int stNum;
+    bool operator<(const stripNum& s) const {
+      if (chamberType == s.chamberType) {
+        if (iEta == s.iEta) {
+          return stNum < s.stNum;
+        } else {
+          return iEta < s.iEta;
+        }
+      } else {
+        return chamberType < s.chamberType;
+      }
+    }
+
+    COND_SERIALIZABLE;
+  };
+
   GEMeMap();
+
   explicit GEMeMap(const std::string& version);
 
-  virtual ~GEMeMap();
+  ~GEMeMap();
 
   const std::string& version() const;
-  void convert(GEMROMapping& romap);
-  void convertDummy(GEMROMapping& romap);
+  void setDummy();
 
-  struct GEMChamberMap {
-    std::vector<unsigned int> fedId;
-    std::vector<uint8_t> amcNum;
-    std::vector<uint8_t> gebId;
-    std::vector<int> gemNum;
-    std::vector<int> vfatVer;
+  bool isValidChamber(const chamEC& r) const { return chamberMap_.find(r) != chamberMap_.end(); }
 
-    COND_SERIALIZABLE;
-  };
+  bool isValidChipID(const vfatEC& r) const { return chamIEtas_.find(r) != chamIEtas_.end(); }
 
-  struct GEMVFatMap {
-    std::vector<int> gemNum;
-    std::vector<uint16_t> vfatAdd;
-    std::vector<int> vfatType;
-    std::vector<int> iEta;
-    std::vector<int> localPhi;
+  bool isValidAMC(const sectorEC& r) const { return std::find(amcVec_.begin(), amcVec_.end(), r) != amcVec_.end(); }
 
-    COND_SERIALIZABLE;
-  };
-  struct GEMStripMap {
-    std::vector<int> vfatType;
-    std::vector<int> vfatCh;
-    std::vector<int> vfatStrip;
+  bool isValidStripNum(const stripNum& r) const { return stChMap_.find(r) != stChMap_.end(); }
 
-    COND_SERIALIZABLE;
-  };
+  void add(sectorEC e) { amcVec_.push_back(e); }
 
-  std::vector<GEMChamberMap> theChamberMap_;
-  std::vector<GEMVFatMap> theVFatMap_;
-  std::vector<GEMStripMap> theStripMap_;
+  const chamDC& chamberPos(const chamEC& r) const { return chamberMap_.at(r); }
+  void add(chamEC e, chamDC d) { chamberMap_[e] = d; }
+
+  const std::vector<uint16_t> getVfats(const int type) const { return chamVfats_.at(type); }
+  void add(int type, uint16_t d) {
+    if (std::find(chamVfats_[type].begin(), chamVfats_[type].end(), d) == chamVfats_[type].end())
+      chamVfats_[type].push_back(d);
+  }
+
+  const std::vector<int> getIEtas(const vfatEC dc) const { return chamIEtas_.at(dc); }
+  void add(vfatEC d, int iEta) {
+    if (std::find(chamIEtas_[d].begin(), chamIEtas_[d].end(), iEta) == chamIEtas_[d].end())
+      chamIEtas_[d].push_back(iEta);
+  }
+
+  const channelNum& hitPos(const stripNum& s) const { return stChMap_.at(s); }
+  const stripNum& hitPos(const channelNum& c) const { return chStMap_.at(c); }
+
+  void add(channelNum c, stripNum s) { chStMap_[c] = s; }
+  void add(stripNum s, channelNum c) { stChMap_[s] = c; }
 
 private:
   std::string theVersion;
+
+  std::vector<sectorEC> amcVec_;
+
+  // electronics map to GEMDetId chamber
+  std::map<chamEC, chamDC> chamberMap_;
+
+  std::map<int, std::vector<uint16_t>> chamVfats_;
+  std::map<vfatEC, std::vector<int>> chamIEtas_;
+
+  std::map<channelNum, stripNum> chStMap_;
+  std::map<stripNum, channelNum> stChMap_;
 
   COND_SERIALIZABLE;
 
