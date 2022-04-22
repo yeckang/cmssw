@@ -6,7 +6,6 @@
 
 #include "CondFormats/DataRecord/interface/GEMeMapRcd.h"
 #include "CondFormats/GEMObjects/interface/GEMeMap.h"
-#include "CondFormats/GEMObjects/interface/GEMROMapping.h"
 #include "DataFormats/Common/interface/Handle.h"
 #include "DataFormats/FEDRawData/interface/FEDHeader.h"
 #include "DataFormats/FEDRawData/interface/FEDNumbering.h"
@@ -26,13 +25,13 @@
 #include "FWCore/Utilities/interface/InputTag.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
-class GEMDigiToRawModule : public edm::global::EDProducer<edm::RunCache<GEMROMapping>> {
+class GEMDigiToRawModule : public edm::global::EDProducer<edm::RunCache<GEMeMap>> {
 public:
   /// Constructor
   GEMDigiToRawModule(const edm::ParameterSet& pset);
 
   // global::EDProducer
-  std::shared_ptr<GEMROMapping> globalBeginRun(edm::Run const&, edm::EventSetup const&) const override;
+  std::shared_ptr<GEMeMap> globalBeginRun(edm::Run const&, edm::EventSetup const&) const override;
   void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
   void globalEndRun(edm::Run const&, edm::EventSetup const&) const override{};
 
@@ -67,20 +66,17 @@ void GEMDigiToRawModule::fillDescriptions(edm::ConfigurationDescriptions& descri
   descriptions.add("gemPackerDefault", desc);
 }
 
-std::shared_ptr<GEMROMapping> GEMDigiToRawModule::globalBeginRun(edm::Run const&, edm::EventSetup const& iSetup) const {
-  auto gemROmap = std::make_shared<GEMROMapping>();
+std::shared_ptr<GEMeMap> GEMDigiToRawModule::globalBeginRun(edm::Run const&, edm::EventSetup const& iSetup) const {
   if (useDBEMap_) {
     const auto& eMap = iSetup.getData(gemEMapToken_);
-    auto gemEMap = std::make_unique<GEMeMap>(eMap);
-    gemEMap->convert(*gemROmap);
-    gemEMap.reset();
+    auto gemEMap = std::make_shared<GEMeMap>(eMap);
+    return gemEMap;
   } else {
     // no EMap in DB, using dummy
-    auto gemEMap = std::make_unique<GEMeMap>();
-    gemEMap->convertDummy(*gemROmap);
-    gemEMap.reset();
+    auto gemEMap = std::make_shared<GEMeMap>();
+    gemEMap->setDummy();
+    return gemEMap;
   }
-  return gemROmap;
 }
 
 void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::EventSetup const&) const {
@@ -93,7 +89,7 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
     return;
   }
 
-  auto gemROMap = runCache(iEvent.getRun().index());
+  auto gemEMap = runCache(iEvent.getRun().index());
 
   std::vector<std::unique_ptr<GEMAMC13>> amc13s;
   amc13s.reserve(FEDNumbering::MAXGEMFEDID - FEDNumbering::MINGEMFEDID + 1);
@@ -131,19 +127,19 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
 
       for (uint8_t gebId = 0; gebId <= GEMeMap::maxGEBs_; ++gebId) {
         std::unique_ptr<GEMOptoHybrid> optoH = std::make_unique<GEMOptoHybrid>();
-        GEMROMapping::chamEC geb_ec{fedId, amcNum, gebId};
+        GEMeMap::chamEC geb_ec{fedId, amcNum, gebId};
 
-        if (!gemROMap->isValidChamber(geb_ec))
+        if (!gemEMap->isValidChamber(geb_ec))
           continue;
-        GEMROMapping::chamDC geb_dc = gemROMap->chamberPos(geb_ec);
+        GEMeMap::chamDC geb_dc = gemEMap->chamberPos(geb_ec);
         GEMDetId cid = geb_dc.detId;
 
-        auto vfats = gemROMap->getVfats(geb_dc.chamberType);
+        auto vfats = gemEMap->getVfats(geb_dc.chamberType);
         int chamberType = geb_dc.chamberType;
 
         for (auto const& vfatId : vfats) {
-          GEMROMapping::vfatEC vfat_ec{chamberType, vfatId};
-          auto iEtas = gemROMap->getIEtas(vfat_ec);
+          GEMeMap::vfatEC vfat_ec{chamberType, vfatId};
+          auto iEtas = gemEMap->getIEtas(vfat_ec);
           for (auto iEta : iEtas) {
             GEMDetId gemId(cid.region(), cid.ring(), cid.station(), cid.layer(), cid.chamber(), iEta);
 
@@ -163,11 +159,11 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
                 int strip = digi.strip();
 
                 hasDigi = true;
-                GEMROMapping::stripNum stMap = {geb_dc.chamberType, iEta, strip};
+                GEMeMap::stripNum stMap = {geb_dc.chamberType, iEta, strip};
 
-                if (!gemROMap->isValidStripNum(stMap))
+                if (!gemEMap->isValidStripNum(stMap))
                   continue;
-                GEMROMapping::channelNum chMap = gemROMap->hitPos(stMap);
+                GEMeMap::channelNum chMap = gemEMap->hitPos(stMap);
 
                 if (chMap.vfatAdd != vfatId)
                   continue;

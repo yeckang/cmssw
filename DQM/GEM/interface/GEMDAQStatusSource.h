@@ -18,7 +18,6 @@
 
 #include "CondFormats/DataRecord/interface/GEMeMapRcd.h"
 #include "CondFormats/GEMObjects/interface/GEMeMap.h"
-#include "CondFormats/GEMObjects/interface/GEMROMapping.h"
 #include "DataFormats/GEMDigi/interface/GEMDigiCollection.h"
 #include "DataFormats/GEMDigi/interface/GEMVFATStatusCollection.h"
 #include "DataFormats/GEMDigi/interface/GEMOHStatusCollection.h"
@@ -71,8 +70,6 @@ private:
   void SetLabelVFATStatus(MonitorElement *h2Status);
 
   edm::ESGetToken<GEMeMap, GEMeMapRcd> gemEMapToken_;
-  //std::shared_ptr<GEMROMapping> gemROMap_;
-  const GEMeMap *gemEMap_;
 
   edm::EDGetToken tagVFAT_;
   edm::EDGetToken tagOH_;
