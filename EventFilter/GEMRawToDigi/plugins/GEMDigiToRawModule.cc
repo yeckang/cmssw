@@ -4,9 +4,8 @@
  *  \author J. Lee - UoS
  */
 
-#include "CondFormats/DataRecord/interface/GEMeMapRcd.h"
-#include "CondFormats/GEMObjects/interface/GEMeMap.h"
-#include "CondFormats/GEMObjects/interface/GEMROMapping.h"
+#include "CondFormats/DataRecord/interface/GEMeMappingRcd.h"
+#include "CondFormats/GEMObjects/interface/GEMeMapping.h"
 #include "DataFormats/Common/interface/Handle.h"
 #include "DataFormats/FEDRawData/interface/FEDHeader.h"
 #include "DataFormats/FEDRawData/interface/FEDNumbering.h"
@@ -26,13 +25,13 @@
 #include "FWCore/Utilities/interface/InputTag.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
-class GEMDigiToRawModule : public edm::global::EDProducer<edm::RunCache<GEMROMapping>> {
+class GEMDigiToRawModule : public edm::global::EDProducer<edm::RunCache<GEMeMapping>> {
 public:
   /// Constructor
   GEMDigiToRawModule(const edm::ParameterSet& pset);
 
   // global::EDProducer
-  std::shared_ptr<GEMROMapping> globalBeginRun(edm::Run const&, edm::EventSetup const&) const override;
+  std::shared_ptr<GEMeMapping> globalBeginRun(edm::Run const&, edm::EventSetup const&) const override;
   void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
   void globalEndRun(edm::Run const&, edm::EventSetup const&) const override{};
 
@@ -42,7 +41,7 @@ public:
 private:
   int event_type_;
   edm::EDGetTokenT<GEMDigiCollection> digi_token;
-  edm::ESGetToken<GEMeMap, GEMeMapRcd> gemEMapToken_;
+  edm::ESGetToken<GEMeMapping, GEMeMappingRcd> gemEMapToken_;
   bool useDBEMap_;
 };
 
@@ -55,7 +54,7 @@ GEMDigiToRawModule::GEMDigiToRawModule(const edm::ParameterSet& pset)
       useDBEMap_(pset.getParameter<bool>("useDBEMap")) {
   produces<FEDRawDataCollection>();
   if (useDBEMap_) {
-    gemEMapToken_ = esConsumes<GEMeMap, GEMeMapRcd, edm::Transition::BeginRun>();
+    gemEMapToken_ = esConsumes<GEMeMapping, GEMeMappingRcd, edm::Transition::BeginRun>();
   }
 }
 
@@ -67,20 +66,17 @@ void GEMDigiToRawModule::fillDescriptions(edm::ConfigurationDescriptions& descri
   descriptions.add("gemPackerDefault", desc);
 }
 
-std::shared_ptr<GEMROMapping> GEMDigiToRawModule::globalBeginRun(edm::Run const&, edm::EventSetup const& iSetup) const {
-  auto gemROmap = std::make_shared<GEMROMapping>();
+std::shared_ptr<GEMeMapping> GEMDigiToRawModule::globalBeginRun(edm::Run const&, edm::EventSetup const& iSetup) const {
   if (useDBEMap_) {
     const auto& eMap = iSetup.getData(gemEMapToken_);
-    auto gemEMap = std::make_unique<GEMeMap>(eMap);
-    gemEMap->convert(*gemROmap);
-    gemEMap.reset();
+    auto gemEMap = std::make_shared<GEMeMapping>(eMap);
+    return gemEMap;
   } else {
     // no EMap in DB, using dummy
-    auto gemEMap = std::make_unique<GEMeMap>();
-    gemEMap->convertDummy(*gemROmap);
-    gemEMap.reset();
+    auto gemEMap = std::make_shared<GEMeMapping>();
+    gemEMap->setDummy();
+    return gemEMap;
   }
-  return gemROmap;
 }
 
 void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::EventSetup const&) const {
@@ -93,7 +89,7 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
     return;
   }
 
-  auto gemROMap = runCache(iEvent.getRun().index());
+  auto gemEMap = runCache(iEvent.getRun().index());
 
   std::vector<std::unique_ptr<GEMAMC13>> amc13s;
   amc13s.reserve(FEDNumbering::MAXGEMFEDID - FEDNumbering::MINGEMFEDID + 1);
@@ -125,63 +121,71 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
     uint32_t amc13EvtLength = 0;
     std::unique_ptr<GEMAMC13> amc13 = std::make_unique<GEMAMC13>();
 
-    for (uint8_t amcNum = 0; amcNum <= GEMeMap::maxAMCs_; ++amcNum) {
+    for (uint8_t amcNum = 0; amcNum <= GEMeMapping::maxAMCs_; ++amcNum) {
       uint32_t amcSize = 0;
       std::unique_ptr<GEMAMC> amc = std::make_unique<GEMAMC>();
 
-      for (uint8_t gebId = 0; gebId <= GEMeMap::maxGEBs_; ++gebId) {
+      for (uint8_t gebId = 0; gebId <= GEMeMapping::maxGEBs_; ++gebId) {
         std::unique_ptr<GEMOptoHybrid> optoH = std::make_unique<GEMOptoHybrid>();
-        GEMROMapping::chamEC geb_ec{fedId, amcNum, gebId};
+        GEMeMapping::chamEC geb_ec{fedId, amcNum, gebId};
 
-        if (!gemROMap->isValidChamber(geb_ec))
+        if (!gemEMap->isValidChamber(geb_ec))
           continue;
-        GEMROMapping::chamDC geb_dc = gemROMap->chamberPos(geb_ec);
+        GEMeMapping::chamDC geb_dc = gemEMap->chamberPos(geb_ec);
+        GEMDetId cid = geb_dc.detId;
 
-        auto vfats = gemROMap->getVfats(geb_dc.detId);
-        for (auto const& vfat_ec : vfats) {
-          GEMROMapping::vfatDC vfat_dc = gemROMap->vfatPos(vfat_ec);
-          GEMDetId gemId = vfat_dc.detId;
-          uint16_t vfatId = vfat_ec.vfatAdd;
+        auto vfats = gemEMap->getVfats(geb_dc.chamberType);
+        int chamberType = geb_dc.chamberType;
 
-          for (auto const& gemBx : gemBxMap) {
-            int bc = BX_id + gemBx.first;
+        for (auto const& vfatId : vfats) {
+          GEMeMapping::vfatEC vfat_ec{chamberType, vfatId};
+          auto iEtas = gemEMap->getIEtas(vfat_ec);
+          for (auto iEta : iEtas) {
+            GEMDetId gemId(cid.region(), cid.ring(), cid.station(), cid.layer(), cid.chamber(), iEta);
 
-            bool hasDigi = false;
-            uint64_t lsData = 0;  ///<channels from 1to64
-            uint64_t msData = 0;  ///<channels from 65to128
+            for (auto const& gemBx : gemBxMap) {
+              int bc = BX_id + gemBx.first;
 
-            GEMDigiCollection inBxGemDigis = gemBx.second;
-            const GEMDigiCollection::Range& range = inBxGemDigis.get(gemId);
-            for (GEMDigiCollection::const_iterator digiIt = range.first; digiIt != range.second; ++digiIt) {
-              const GEMDigi& digi = (*digiIt);
+              bool hasDigi = false;
+              uint64_t lsData = 0;  ///<channels from 1to64
+              uint64_t msData = 0;  ///<channels from 65to128
 
-              int localStrip = digi.strip() - vfat_dc.localPhi * GEMeMap::maxChan_;
+              GEMDigiCollection inBxGemDigis = gemBx.second;
+              const GEMDigiCollection::Range& range = inBxGemDigis.get(gemId);
 
-              // skip strips not in current vFat
-              if (localStrip < 0 || localStrip > GEMeMap::maxChan_ - 1)
+              for (GEMDigiCollection::const_iterator digiIt = range.first; digiIt != range.second; ++digiIt) {
+                const GEMDigi& digi = (*digiIt);
+
+                int strip = digi.strip();
+
+                hasDigi = true;
+                GEMeMapping::stripNum stMap = {geb_dc.chamberType, iEta, strip};
+
+                if (!gemEMap->isValidStripNum(stMap))
+                  continue;
+                GEMeMapping::channelNum chMap = gemEMap->hitPos(stMap);
+
+                if (chMap.vfatAdd != vfatId)
+                  continue;
+
+                if (chMap.chNum < 64)
+                  lsData |= 1UL << chMap.chNum;
+                else
+                  msData |= 1UL << (chMap.chNum - 64);
+
+                LogDebug("GEMDigiToRawModule")
+                    << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
+                    << ",type:" << geb_dc.chamberType << " id:" << gemId << " ch:" << chMap.chNum
+                    << " st:" << digi.strip() << " bx:" << digi.bx();
+              }
+
+              if (!hasDigi)
                 continue;
-
-              hasDigi = true;
-              GEMROMapping::stripNum stMap = {vfat_dc.vfatType, localStrip};
-              GEMROMapping::channelNum chMap = gemROMap->hitPos(stMap);
-
-              if (chMap.chNum < 64)
-                lsData |= 1UL << chMap.chNum;
-              else
-                msData |= 1UL << (chMap.chNum - 64);
-
-              LogDebug("GEMDigiToRawModule")
-                  << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
-                  << ",type:" << vfat_dc.vfatType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
-                  << " bx:" << digi.bx();
+              // only make vfat with hits
+              amcSize += 3;
+              auto vfat = std::make_unique<GEMVFAT>(geb_dc.vfatVer, bc, LV1_id, vfatId, lsData, msData);
+              optoH->addVFAT(*vfat);
             }
-
-            if (!hasDigi)
-              continue;
-            // only make vfat with hits
-            amcSize += 3;
-            auto vfat = std::make_unique<GEMVFAT>(geb_dc.vfatVer, bc, LV1_id, vfatId, lsData, msData);
-            optoH->addVFAT(*vfat);
           }
         }  // end of vfats in GEB
 

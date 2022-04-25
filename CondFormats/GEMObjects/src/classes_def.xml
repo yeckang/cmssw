@@ -13,6 +13,20 @@
   <class name="std::vector<GEMeMap::GEMVFatMap>"/>
   <class name="GEMeMap::GEMStripMap"/>
   <class name="std::vector<GEMeMap::GEMStripMap>"/>
+
+  <class name="GEMeMapping"/>
+  <class name="GEMeMapping::sectorEC"/>
+  <class name="GEMeMapping::chamEC"/>
+  <class name="GEMeMapping::chamDC"/>
+  <class name="GEMeMapping::vfatEC"/>
+  <class name="GEMeMapping::channelNum"/>
+  <class name="GEMeMapping::stripNum"/>
+  <class name="std::vector<GEMeMapping::sectorEC>"/>
+  <class name="std::map<GEMeMapping::chamEC, GEMeMapping::chamDC>"/>
+  <class name="std::map<int, std::vector<uint16_t>>"/>
+  <class name="std::map<GEMeMapping::vfatEC, std::vector<int>>"/>
+  <class name="std::map<GEMeMapping::channelNum, GEMeMapping::stripNum>"/>
+  <class name="std::map<GEMeMapping::stripNum, GEMeMapping::channelNum>"/>
   
   <class name="GEMDeadStrips"/>
   <class name="GEMDeadStrips::DeadItem"/>

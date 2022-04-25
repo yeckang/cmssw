@@ -10,7 +10,7 @@ GEMDAQStatusSource::GEMDAQStatusSource(const edm::ParameterSet &cfg) : GEMDQMBas
   tagAMC13_ = consumes<GEMAMC13StatusCollection>(cfg.getParameter<edm::InputTag>("AMC13InputLabel"));
 
   nAMCSlots_ = cfg.getParameter<Int_t>("AMCSlots");
-  gemEMapToken_ = esConsumes<GEMeMap, GEMeMapRcd, edm::Transition::BeginRun>();
+  gemEMapToken_ = esConsumes<GEMeMapping, GEMeMappingRcd, edm::Transition::BeginRun>();
 }
 
 void GEMDAQStatusSource::fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
@@ -27,36 +27,36 @@ void GEMDAQStatusSource::fillDescriptions(edm::ConfigurationDescriptions &descri
 }
 
 void GEMDAQStatusSource::LoadROMap(edm::EventSetup const &iSetup) {
-  auto gemROMap = std::make_shared<GEMROMapping>();
   //if (useDBEMap_)
   if (true) {
     const auto &eMap = iSetup.getData(gemEMapToken_);
-    auto gemEMap = std::make_unique<GEMeMap>(eMap);
-    gemEMap->convert(*gemROMap);
+    auto gemEMap = std::make_unique<GEMeMapping>(eMap);
 
-    for (auto imap : gemEMap->theChamberMap_) {
-      int nNumChamber = (int)imap.fedId.size();
-      for (int i = 0; i < nNumChamber; i++) {
-        unsigned int fedId = imap.fedId[i];
-        uint8_t amcNum = imap.amcNum[i];
-        uint8_t gebId = imap.gebId[i];
-        GEMROMapping::chamEC geb_ec{fedId, amcNum, gebId};
-        GEMROMapping::chamDC geb_dc = gemROMap->chamberPos(geb_ec);
-        GEMDetId gemChId = geb_dc.detId;
+    for (auto const& [ec, dc] : gemEMap->chamberMap()) {
+      unsigned int fedId = ec.fedId;
+      uint8_t amcNum = ec.amcNum;
+      GEMDetId gemChId(dc.detId);
 
-        mapFEDIdToRe_[fedId] = gemChId.region();
-        mapAMC13ToListChamber_[fedId].push_back(gemChId);
-        mapAMCToListChamber_[{fedId, amcNum}].push_back(gemChId);
-      }
+      mapFEDIdToRe_[fedId] = gemChId.region();
+      mapAMC13ToListChamber_[fedId].push_back(gemChId);
+      mapAMCToListChamber_[{fedId, amcNum}].push_back(gemChId);
     }
 
-    gemEMap.reset();
   } else {
     // no EMap in DB, using dummy
     // FIXME: How to add mapFEDIdToRe_ and mapDetIdToAMC_??
-    auto gemEMap = std::make_unique<GEMeMap>();
-    gemEMap->convertDummy(*gemROMap);
-    gemEMap.reset();
+    auto gemEMap = std::make_unique<GEMeMapping>();
+    gemEMap->setDummy();
+
+    for (auto const& [ec, dc] : gemEMap->chamberMap()) {
+      unsigned int fedId = ec.fedId;
+      uint8_t amcNum = ec.amcNum;
+      GEMDetId gemChId(dc.detId);
+
+      mapFEDIdToRe_[fedId] = gemChId.region();
+      mapAMC13ToListChamber_[fedId].push_back(gemChId);
+      mapAMCToListChamber_[{fedId, amcNum}].push_back(gemChId);
+    }
   }
 }
 
