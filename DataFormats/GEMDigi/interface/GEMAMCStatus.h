@@ -19,6 +19,8 @@ public:
       uint16_t DAQclocklocked : 1;
       uint16_t DAQnotReday : 1;
       uint16_t BC0locked : 1;
+      uint16_t badFEDId : 1;
+      uint16_t L1AFull : 1;
     };
   };
   union Warnings {
@@ -26,6 +28,7 @@ public:
     struct {
       uint8_t InValidOH : 1;
       uint8_t backPressure : 1;
+      uint8_t L1ANearFull : 1;
     };
   };
 
@@ -41,10 +44,13 @@ public:
     error.DAQclocklocked = !amc.daqClockLocked();
     error.DAQnotReday = !amc.daqReady();
     error.BC0locked = !amc.bc0locked();
+    error.badFEDId = (amc13->sourceId() != amc.softSrcId() and amc.formatVer() != 0);
+    error.L1AFull = (!amc.l1aF() and amc.formatVer() != 0);
     errors_ = error.ecodes;
 
     Warnings warn{0};
     warn.backPressure = amc.backPressure();
+    warn.L1ANearFull = (amc.l1aNF() and amc.formatVer() != 0);
     warnings_ = warn.wcodes;
   }
 
