@@ -45,7 +45,7 @@ public:
     error.DAQnotReday = !amc.daqReady();
     error.BC0locked = !amc.bc0locked();
     error.badFEDId = (amc13->sourceId() != amc.softSrcId() and amc.formatVer() != 0);
-    error.L1AFull = (!amc.l1aF() and amc.formatVer() != 0);
+    error.L1AFull = (amc.l1aF() and amc.formatVer() != 0);
     errors_ = error.ecodes;
 
     Warnings warn{0};
