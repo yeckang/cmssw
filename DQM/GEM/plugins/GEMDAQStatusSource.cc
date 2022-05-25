@@ -3,14 +3,14 @@
 using namespace std;
 using namespace edm;
 
-GEMDAQStatusSource::GEMDAQStatusSource(const edm::ParameterSet &cfg) : GEMDQMBase(cfg) {
+GEMDAQStatusSource::GEMDAQStatusSource(const edm::ParameterSet &cfg)
+    : GEMDQMBase(cfg), gemChMapToken_(esConsumes<GEMChMap, GEMChMapRcd, edm::Transition::BeginRun>()) {
   tagVFAT_ = consumes<GEMVFATStatusCollection>(cfg.getParameter<edm::InputTag>("VFATInputLabel"));
   tagOH_ = consumes<GEMOHStatusCollection>(cfg.getParameter<edm::InputTag>("OHInputLabel"));
   tagAMC_ = consumes<GEMAMCStatusCollection>(cfg.getParameter<edm::InputTag>("AMCInputLabel"));
   tagAMC13_ = consumes<GEMAMC13StatusCollection>(cfg.getParameter<edm::InputTag>("AMC13InputLabel"));
 
   nAMCSlots_ = cfg.getParameter<Int_t>("AMCSlots");
-  gemChMapToken_ = esConsumes<GEMChMap, GEMChMapRcd, edm::Transition::BeginRun>();
 }
 
 void GEMDAQStatusSource::fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
@@ -44,7 +44,6 @@ void GEMDAQStatusSource::LoadROMap(edm::EventSetup const &iSetup) {
 
   } else {
     // no EMap in DB, using dummy
-    // FIXME: How to add mapFEDIdToRe_ and mapDetIdToAMC_??
     auto gemChMap = std::make_unique<GEMChMap>();
     gemChMap->setDummy();
 

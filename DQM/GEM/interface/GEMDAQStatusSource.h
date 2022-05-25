@@ -69,7 +69,7 @@ private:
   void SetLabelOHStatus(MonitorElement *h2Status);
   void SetLabelVFATStatus(MonitorElement *h2Status);
 
-  edm::ESGetToken<GEMChMap, GEMChMapRcd> gemChMapToken_;
+  const edm::ESGetToken<GEMChMap, GEMChMapRcd> gemChMapToken_;
 
   edm::EDGetToken tagVFAT_;
   edm::EDGetToken tagOH_;
