@@ -19,6 +19,8 @@ public:
       uint16_t DAQclocklocked : 1;
       uint16_t DAQnotReday : 1;
       uint16_t BC0locked : 1;
+      uint16_t badFEDId : 1;
+      uint16_t L1AFull : 1;
     };
   };
   union Warnings {
@@ -26,6 +28,7 @@ public:
     struct {
       uint8_t InValidOH : 1;
       uint8_t backPressure : 1;
+      uint8_t L1ANearFull : 1;
     };
   };
 
@@ -36,15 +39,19 @@ public:
     error.badEC = (amc13->lv1Id() != amc.lv1Id());
     error.badBC = (amc13->bunchCrossing() != amc.bunchCrossing());
     error.badRunType = amc.runType() != 0x1;
-    error.badOC = (amc13->orbitNumber() != amc.orbitNumber());
+    if (amc.formatVer() == 0) error.badOC = (uint16_t(amc13->orbitNumber()) != amc.orbitNumber());
+    else error.badOC = (uint32_t(amc13->orbitNumber()) != amc.orbitNumber());
     error.MMCMlocked = !amc.mmcmLocked();
     error.DAQclocklocked = !amc.daqClockLocked();
     error.DAQnotReday = !amc.daqReady();
     error.BC0locked = !amc.bc0locked();
+    error.badFEDId = (amc13->sourceId() != amc.softSrcId() and amc.formatVer() != 0);
+    error.L1AFull = (amc.l1aF() and amc.formatVer() != 0);
     errors_ = error.ecodes;
 
     Warnings warn{0};
     warn.backPressure = amc.backPressure();
+    warn.L1ANearFull = (amc.l1aNF() and amc.formatVer() != 0);
     warnings_ = warn.wcodes;
   }
 

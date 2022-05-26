@@ -187,7 +187,7 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
                 continue;
               // only make vfat with hits
               amcSize += 3;
-              auto vfat = std::make_unique<GEMVFAT>(geb_dc.vfatVer, bc, LV1_id, vfatId, lsData, msData);
+              auto vfat = std::make_unique<GEMVFAT>(bc, LV1_id, vfatId, lsData, msData);
               optoH->addVFAT(*vfat);
             }
           }

@@ -181,7 +181,8 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
         if (st_oh.isBad()) {
           LogDebug("GEMRawToDigiModule") << st_oh;
           edm::LogWarning("GEMRawToDigiModule")
-              << "amcNum:" << int(amcNum) << " OHnum:" << int(gebId) << " status: " << st_oh;
+              << "fedId:" << int(fedId) << "amcNum:" << int(amcNum) << " OHnum:" << int(gebId) << " status: " << st_oh << " version: " << int(optoHybrid.version())
+              << " vfatWordCnt:" << int(optoHybrid.vfatWordCnt()) << " vfatWordCntT:" << int(optoHybrid.vfatWordCntT());
           if (keepDAQStatus_) {
             outOHStatus.get()->insertDigi(gemChId, st_oh);
           }
@@ -192,7 +193,6 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
         //Read vfat data
         for (auto vfat : *optoHybrid.vFATs()) {
           // set vfat fw version
-          vfat.setVersion(geb_dc.vfatVer);
           uint16_t vfatId = vfat.vfatId();
           GEMROMapping::vfatDC vfat_dc{geb_dc.chamberType, vfatId};
 
@@ -245,10 +245,10 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
 
             GEMDigi digi(stripId, bx);
 
-            LogDebug("GEMRawToDigiModule")
-                << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
-                << ",type:" << vfat_dc.chamberType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
-                << " bx:" << digi.bx();
+            //LogDebug("GEMRawToDigiModule")
+            //    << "fed: " << fedId << " amc:" << int(amcNum) << " geb:" << int(gebId) << " vfat id:" << int(vfatId)
+            //    << ",type:" << vfat_dc.chamberType << " id:" << gemId << " ch:" << chMap.chNum << " st:" << digi.strip()
+            //    << " bx:" << digi.bx();
 
             outGEMDigis.get()->insertDigi(gemId, digi);
 
