@@ -42,7 +42,7 @@ public:
     if (amc.formatVer() == 0)
       error.badOC = (uint16_t(amc13->orbitNumber()) != amc.orbitNumber());
     else
-      error.badOC = (uint32_t(amc13->orbitNumber()) != amc.orbitNumber());
+      error.badOC = (amc13->orbitNumber() != amc.orbitNumber());
     error.MMCMlocked = !amc.mmcmLocked();
     error.DAQclocklocked = !amc.daqClockLocked();
     error.DAQnotReday = !amc.daqReady();
