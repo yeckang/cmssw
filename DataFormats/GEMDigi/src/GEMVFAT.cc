@@ -1,25 +1,40 @@
 #include "DataFormats/GEMDigi/interface/GEMVFAT.h"
 #include <iostream>
 
-GEMVFAT::GEMVFAT() : phiPos_(0), fw_(0), sw_(0), tw_(0) {}
+GEMVFAT::GEMVFAT() : ver_(0), phiPos_(0), fw_(0), sw_(0), tw_(0) {}
 
-GEMVFAT::GEMVFAT(
-    const uint16_t BC, const uint32_t EC, const uint16_t chipID, const uint64_t lsDatas, const uint64_t msDatas) {
+GEMVFAT::GEMVFAT(const int vfatVer,
+                 const uint16_t BC,
+                 const uint32_t EC,
+                 const uint16_t chipID,
+                 const uint64_t lsDatas,
+                 const uint64_t msDatas) {
   // this constructor only used for packing sim digis
   VFATfirst fw{0};
   VFATsecond sw{0};
   VFATthird tw{0};
 
   fw.header = 0x1E;
-  fw.bc = BC;
-  fw.ec = EC;
-  fw.pos = chipID;
+
+  if (vfatVer == 3) {
+    fw.bc = BC;
+    fw.ec = EC;
+    fw.pos = chipID;
+  } else {
+    fw.chipID = chipID;
+    fw.b1110 = 14;
+    fw.b1100 = 12;
+    fw.b1010 = 10;
+    fw.ecV2 = EC;
+    fw.bcV2 = BC;
+  }
 
   sw.lsData1 = lsDatas >> 48;
   tw.lsData2 = lsDatas & 0x0000ffffffffffff;
 
   fw.msData1 = msDatas >> 48;
   sw.msData2 = msDatas & 0x0000ffffffffffff;
+  ver_ = vfatVer;
 
   fw_ = fw.word;
   sw_ = sw.word;
@@ -29,6 +44,22 @@ GEMVFAT::GEMVFAT(
   tw.crc = checkCRC();
   // once crc is found, save new third word
   tw_ = tw.word;
+}
+
+uint8_t GEMVFAT::quality() {
+  uint8_t q = 0;
+  if (ver_ == 2) {
+    if (VFATthird{tw_}.crc != checkCRC())
+      q = 1;
+    if (VFATfirst{fw_}.b1010 != 10)
+      q |= 1UL << 1;
+    if (VFATfirst{fw_}.b1100 != 12)
+      q |= 1UL << 2;
+    if (VFATfirst{fw_}.b1110 != 14)
+      q |= 1UL << 3;
+  }
+  // quality test not yet implemented in v3
+  return q;
 }
 
 uint16_t GEMVFAT::crc_cal(uint16_t crc_in, uint16_t dato) {
@@ -53,6 +84,10 @@ uint16_t GEMVFAT::crc_cal(uint16_t crc_in, uint16_t dato) {
 
 uint16_t GEMVFAT::checkCRC() {
   uint16_t vfatBlockWords[12];
+  vfatBlockWords[11] = ((0x000f & VFATfirst{fw_}.b1010) << 12) | VFATfirst{fw_}.bcV2;
+  vfatBlockWords[10] =
+      ((0x000f & VFATfirst{fw_}.b1100) << 12) | ((0x00ff & VFATfirst{fw_}.ecV2) << 4) | (0x000f & VFATfirst{fw_}.flag);
+  vfatBlockWords[9] = ((0x000f & VFATfirst{fw_}.b1110) << 12) | VFATfirst{fw_}.chipID;
   vfatBlockWords[8] = (0xffff000000000000 & msData()) >> 48;
   vfatBlockWords[7] = (0x0000ffff00000000 & msData()) >> 32;
   vfatBlockWords[6] = (0x00000000ffff0000 & msData()) >> 16;

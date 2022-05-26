@@ -42,7 +42,7 @@ private:
   int event_type_;
   edm::EDGetTokenT<GEMDigiCollection> digi_token;
   edm::ESGetToken<GEMChMap, GEMChMapRcd> gemChMapToken_;
-  bool useDBEMap_;
+  bool useDBEMap_, useVFATv2_;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -51,7 +51,8 @@ DEFINE_FWK_MODULE(GEMDigiToRawModule);
 GEMDigiToRawModule::GEMDigiToRawModule(const edm::ParameterSet& pset)
     : event_type_(pset.getParameter<int>("eventType")),
       digi_token(consumes<GEMDigiCollection>(pset.getParameter<edm::InputTag>("gemDigi"))),
-      useDBEMap_(pset.getParameter<bool>("useDBEMap")) {
+      useDBEMap_(pset.getParameter<bool>("useDBEMap")),
+      useVFATv2_(pset.getParameter<bool>("useVFATv2")) {
   produces<FEDRawDataCollection>();
   if (useDBEMap_) {
     gemChMapToken_ = esConsumes<GEMChMap, GEMChMapRcd, edm::Transition::BeginRun>();
@@ -180,7 +181,8 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
                 continue;
               // only make vfat with hits
               amcSize += 3;
-              auto vfat = std::make_unique<GEMVFAT>(bc, LV1_id, vfatId, lsData, msData);
+              int vfatVersion = useVFATv2_ ? 2 : 3;
+              auto vfat = std::make_unique<GEMVFAT>(vfatVersion, bc, LV1_id, vfatId, lsData, msData);
               optoH->addVFAT(*vfat);
             }
           }
