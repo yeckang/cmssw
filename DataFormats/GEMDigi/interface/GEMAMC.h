@@ -62,8 +62,7 @@ public:
     uint64_t word;
     // v301 dataformat
     struct {
-      uint64_t : 3;      // unused
-      uint64_t BCL : 1;  // 1st bit, BC0 locked - If 0, this is a bad condition indicating a
+      uint64_t BCL : 4;  // 1st bit, BC0 locked - If 0, this is a bad condition indicating a
       // problem in the clock or TTC command stream (critical condition)
       uint64_t DR : 1;        // DAQ Ready - If 0, this means that AMC13 is not ready to take data (critical condition)
       uint64_t CL : 1;        // DAQ clock locked- If 0, this indicates a problem in the DAQ clock (critical condition)

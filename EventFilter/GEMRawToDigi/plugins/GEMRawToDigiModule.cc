@@ -44,7 +44,7 @@ public:
 private:
   edm::EDGetTokenT<FEDRawDataCollection> fed_token;
   edm::ESGetToken<GEMChMap, GEMChMapRcd> gemChMapToken_;
-  bool useDBEMap_, keepDAQStatus_, readMultiBX_, ge21Off_, useVFATv2_;
+  bool useDBEMap_, keepDAQStatus_, readMultiBX_, ge21Off_;
   unsigned int fedIdStart_, fedIdEnd_;
   std::unique_ptr<GEMRawToDigi> gemRawToDigi_;
 };
@@ -58,7 +58,6 @@ GEMRawToDigiModule::GEMRawToDigiModule(const edm::ParameterSet& pset)
       keepDAQStatus_(pset.getParameter<bool>("keepDAQStatus")),
       readMultiBX_(pset.getParameter<bool>("readMultiBX")),
       ge21Off_(pset.getParameter<bool>("ge21Off")),
-      useVFATv2_(pset.getParameter<bool>("useVFATv2")),
       fedIdStart_(pset.getParameter<unsigned int>("fedIdStart")),
       fedIdEnd_(pset.getParameter<unsigned int>("fedIdEnd")),
       gemRawToDigi_(std::make_unique<GEMRawToDigi>()) {
@@ -184,7 +183,7 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
         //Read vfat data
         for (auto vfat : *optoHybrid.vFATs()) {
           // set vfat fw version
-          if (useVFATv2_)
+          if (chamberType < 10)
             vfat.setVersion(2);
           else
             vfat.setVersion(3);
