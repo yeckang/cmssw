@@ -130,6 +130,10 @@ public:
     return stChMap_.find({chamberType, iEta, strip}) != stChMap_.end();
   }
 
+  bool isValidChannel(int chamberType, int vfatAdd, int channel) const {
+    return chStMap_.find({chamberType, vfatAdd, channel}) != chStMap_.end();
+  }
+
   void add(sectorEC e) { amcVec_.push_back(e); }
 
   const chamDC& chamberPos(unsigned int fedId, uint8_t amcNum, uint16_t gebId) const {

@@ -216,6 +216,9 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
             if (chan0xf == 0)
               continue;
 
+            if (!gemChMap->isValidChannel(chamberType, vfatId, chan))
+              continue;
+
             auto stMap = gemChMap->getStrip(chamberType, vfatId, chan);
 
             int stripId = stMap.stNum;
