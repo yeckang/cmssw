@@ -45,6 +45,7 @@ private:
   edm::EDGetTokenT<FEDRawDataCollection> fed_token;
   edm::ESGetToken<GEMChMap, GEMChMapRcd> gemChMapToken_;
   bool useDBEMap_, keepDAQStatus_, readMultiBX_, ge21Off_;
+  bool skipBadStatus_;
   unsigned int fedIdStart_, fedIdEnd_;
   std::unique_ptr<GEMRawToDigi> gemRawToDigi_;
 };
@@ -58,6 +59,7 @@ GEMRawToDigiModule::GEMRawToDigiModule(const edm::ParameterSet& pset)
       keepDAQStatus_(pset.getParameter<bool>("keepDAQStatus")),
       readMultiBX_(pset.getParameter<bool>("readMultiBX")),
       ge21Off_(pset.getParameter<bool>("ge21Off")),
+      skipBadStatus_(pset.getParameter<bool>("skipBadStatus")),
       fedIdStart_(pset.getParameter<unsigned int>("fedIdStart")),
       fedIdEnd_(pset.getParameter<unsigned int>("fedIdEnd")),
       gemRawToDigi_(std::make_unique<GEMRawToDigi>()) {
@@ -86,6 +88,7 @@ void GEMRawToDigiModule::fillDescriptions(edm::ConfigurationDescriptions& descri
   desc.add<bool>("keepDAQStatus", true);
   desc.add<bool>("readMultiBX", false);
   desc.add<bool>("ge21Off", false);
+  desc.add<bool>("skipBadStatus", false);
   desc.add<unsigned int>("fedIdStart", FEDNumbering::MINGEMFEDID);
   desc.add<unsigned int>("fedIdEnd", FEDNumbering::MAXGEMFEDID);
   descriptions.add("muonGEMDigisDefault", desc);
@@ -128,7 +131,7 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
       if (keepDAQStatus_) {
         outAMC13Status.get()->insertDigi(fedId, st_amc13);
       }
-      continue;
+      if (!skipBadStatus_) continue;
     }
 
     const uint64_t* word = reinterpret_cast<const uint64_t*>(fedData.data());
@@ -152,7 +155,7 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
         if (keepDAQStatus_) {
           outAMCStatus.get()->insertDigi(fedId, st_amc);
         }
-        continue;
+        if (!skipBadStatus_) continue;
       }
 
       uint16_t amcBx = amc.bunchCrossing();
@@ -178,7 +181,7 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
           if (keepDAQStatus_) {
             outOHStatus.get()->insertDigi(cId, st_oh);
           }
-          continue;
+          if (!skipBadStatus_) continue;
         }
 
         //Read vfat data
@@ -201,7 +204,7 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
             if (keepDAQStatus_) {
               outVFATStatus.get()->insertDigi(cId, st_vfat);
             }
-            continue;
+            if (!skipBadStatus_) continue;
           }
 
           int bx(vfat.bc() - amcBx);
