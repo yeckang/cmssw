@@ -40,6 +40,7 @@ public:
 
 private:
   int event_type_;
+  unsigned int fedIdStart_, fedIdEnd_;
   edm::EDGetTokenT<GEMDigiCollection> digi_token;
   edm::ESGetToken<GEMChMap, GEMChMapRcd> gemChMapToken_;
   bool useDBEMap_;
@@ -50,6 +51,8 @@ DEFINE_FWK_MODULE(GEMDigiToRawModule);
 
 GEMDigiToRawModule::GEMDigiToRawModule(const edm::ParameterSet& pset)
     : event_type_(pset.getParameter<int>("eventType")),
+      fedIdStart_(pset.getParameter<unsigned int>("fedIdStart")),
+      fedIdEnd_(pset.getParameter<unsigned int>("fedIdEnd")),
       digi_token(consumes<GEMDigiCollection>(pset.getParameter<edm::InputTag>("gemDigi"))),
       useDBEMap_(pset.getParameter<bool>("useDBEMap")) {
   produces<FEDRawDataCollection>();
@@ -62,6 +65,8 @@ void GEMDigiToRawModule::fillDescriptions(edm::ConfigurationDescriptions& descri
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("gemDigi", edm::InputTag("simMuonGEMDigis"));
   desc.add<int>("eventType", 0);
+  desc.add<unsigned int>("fedIdStart", FEDNumbering::MINGEMFEDID);
+  desc.add<unsigned int>("fedIdEnd", FEDNumbering::MAXGEMFEDID);
   desc.add<bool>("useDBEMap", false);
   descriptions.add("gemPackerDefault", desc);
 }
@@ -117,7 +122,7 @@ void GEMDigiToRawModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
     }
   }
 
-  for (unsigned int fedId = FEDNumbering::MINGEMFEDID; fedId <= FEDNumbering::MAXGEMFEDID; ++fedId) {
+  for (unsigned int fedId = fedIdStart_; fedId <= fedIdEnd_; ++fedId) {
     uint32_t amc13EvtLength = 0;
     std::unique_ptr<GEMAMC13> amc13 = std::make_unique<GEMAMC13>();
 

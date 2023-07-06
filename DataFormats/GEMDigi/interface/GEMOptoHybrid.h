@@ -73,7 +73,7 @@ public:
     };
   };
 
-  GEMOptoHybrid() : ch_(0), ct_(0), existVFATs_(0){};
+  GEMOptoHybrid() : ch_(0), ct_(0), ver_(0), existVFATs_(0){};
   ~GEMOptoHybrid() { vfatd_.clear(); }
 
   void setVersion(uint8_t i) { ver_ = i; }
@@ -160,10 +160,10 @@ public:
   static const int sizeGebID = 5;
 
 private:
-  uint8_t ver_;  // Data Format version
-
   uint64_t ch_;  // GEBchamberHeader
   uint64_t ct_;  // GEBchamberTrailer
+
+  uint8_t ver_;  // Data Format version
 
   uint32_t existVFATs_;
 
