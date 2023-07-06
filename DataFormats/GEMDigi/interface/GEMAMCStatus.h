@@ -33,14 +33,14 @@ public:
   };
 
   GEMAMCStatus() {}
-  GEMAMCStatus(const GEMAMC13* amc13, const GEMAMC& amc) {
+  GEMAMCStatus(const GEMAMC13* amc13, const GEMAMC& amc, bool isP5data) {
     amcNum_ = amc.amcNum();
     Errors error{0};
     error.badEC = (amc13->lv1Id() != amc.lv1Id());
     // Last BC in AMC13 is different to TCDS, AMC, and VFAT
     error.badBC = !((amc13->bunchCrossing() == amc.bunchCrossing()) ||
                     (amc13->bunchCrossing() == 0 && amc.bunchCrossing() == GEMAMC13::lastBC));
-    error.badRunType = amc.runType() != 0x1;
+    error.badRunType = (amc.runType() != 0x1) and isP5data;
     // Last OC in AMC13 is different to TCDS, AMC, and VFAT
     if (amc.formatVer() == 0)
       error.badOC =

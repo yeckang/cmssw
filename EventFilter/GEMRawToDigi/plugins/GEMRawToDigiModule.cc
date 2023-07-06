@@ -44,7 +44,7 @@ public:
 private:
   edm::EDGetTokenT<FEDRawDataCollection> fed_token;
   edm::ESGetToken<GEMChMap, GEMChMapRcd> gemChMapToken_;
-  bool useDBEMap_, keepDAQStatus_, readMultiBX_, ge21Off_;
+  bool useDBEMap_, keepDAQStatus_, readMultiBX_, isP5data_, ge21Off_;
   unsigned int fedIdStart_, fedIdEnd_;
   std::unique_ptr<GEMRawToDigi> gemRawToDigi_;
 };
@@ -57,6 +57,7 @@ GEMRawToDigiModule::GEMRawToDigiModule(const edm::ParameterSet& pset)
       useDBEMap_(pset.getParameter<bool>("useDBEMap")),
       keepDAQStatus_(pset.getParameter<bool>("keepDAQStatus")),
       readMultiBX_(pset.getParameter<bool>("readMultiBX")),
+      isP5data_(pset.getParameter<bool>("isP5data")),
       ge21Off_(pset.getParameter<bool>("ge21Off")),
       fedIdStart_(pset.getParameter<unsigned int>("fedIdStart")),
       fedIdEnd_(pset.getParameter<unsigned int>("fedIdEnd")),
@@ -86,6 +87,7 @@ void GEMRawToDigiModule::fillDescriptions(edm::ConfigurationDescriptions& descri
   desc.add<bool>("keepDAQStatus", true);
   desc.add<bool>("readMultiBX", false);
   desc.add<bool>("ge21Off", false);
+  desc.add<bool>("isP5data", true);
   desc.add<unsigned int>("fedIdStart", FEDNumbering::MINGEMFEDID);
   desc.add<unsigned int>("fedIdEnd", FEDNumbering::MAXGEMFEDID);
   descriptions.add("muonGEMDigisDefault", desc);
@@ -146,7 +148,7 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
         continue;
       }
 
-      GEMAMCStatus st_amc(amc13.get(), amc);
+      GEMAMCStatus st_amc(amc13.get(), amc, isP5data_);
       if (st_amc.isBad()) {
         LogDebug("GEMRawToDigiModule") << st_amc;
         if (keepDAQStatus_) {
