@@ -200,10 +200,12 @@ void GEMRawToDigiModule::produce(edm::StreamID iID, edm::Event& iEvent, edm::Eve
           GEMVFATStatus st_vfat(amc, optoHybrid, vfat, chamberType, readMultiBX_);
           if (st_vfat.isBad()) {
             LogDebug("GEMRawToDigiModule") << st_vfat;
-            if (keepDAQStatus_) {
-              outVFATStatus.get()->insertDigi(cId, st_vfat);
-            }
-            continue;
+            // At the moment, the data from QC8 has a EC matching problem between VFAT and AMC
+            // Once this issue is resolved, continue bad vfats
+            //if (keepDAQStatus_) {
+            //  outVFATStatus.get()->insertDigi(cId, st_vfat);
+            //}
+            //continue;
           }
 
           int bx(vfat.bc() - amcBx);
