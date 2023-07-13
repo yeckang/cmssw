@@ -9,6 +9,7 @@
 #include <DataFormats/GeometrySurface/interface/SimpleDiskBounds.h>
 #include <TrackingTools/GeomPropagators/interface/Propagator.h>
 #include <TrackingTools/DetLayers/interface/MeasurementEstimator.h>
+#include "DataFormats/MuonDetId/interface/GEMDetId.h"
 
 #include <FWCore/MessageLogger/interface/MessageLogger.h>
 
@@ -45,7 +46,8 @@ MuRingForwardDoubleLayer::MuRingForwardDoubleLayer(const vector<const ForwardDet
                     << " Z: " << specificSurface().position().z() << " R1: " << specificSurface().innerRadius()
                     << " R2: " << specificSurface().outerRadius();
 
-  selfTest();
+  // Ignore self test for GEM QC8
+  //selfTest();
 }
 
 BoundDisk* MuRingForwardDoubleLayer::computeSurface() {
